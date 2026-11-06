@@ -19,7 +19,6 @@ public class Servidor {
     public static void main(String[] args) {
         tiempoInicio = System.currentTimeMillis();
 
-        // Hilo Monitor periódico (Estadísticas solicitadas en la rúbrica)
         Thread hiloMonitor = new Thread(() -> {
             while (true) {
                 try {

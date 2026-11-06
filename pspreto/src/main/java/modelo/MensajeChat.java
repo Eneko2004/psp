@@ -7,11 +7,11 @@ public class MensajeChat implements Serializable {
     private static final long serialVersionUID = 1L;
 
     public enum Tipo {
-        LOGIN,      // Identificación inicial
-        PUBLICO,    // Mensaje para todos
-        PRIVADO,    // Mensaje para un usuario concreto
-        SERVER,     // Avisos del sistema
-        USERLIST    // Lista de usuarios conectados
+        LOGIN,      
+        PUBLICO,    
+        PRIVADO,    
+        SERVER,    
+        USERLIST    
     }
 
     private Tipo tipo;
