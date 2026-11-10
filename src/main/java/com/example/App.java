@@ -1,4 +1,4 @@
-package com.example;
+package com.example; // Ajusta esto según el paquete raíz que estés usando (ej. retopsp o com.example)
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -9,7 +9,8 @@ import javafx.stage.Stage;
 import java.io.IOException;
 
 /**
- * JavaFX App
+ * <h1>Clase Principal de la Interfaz (App)</h1>
+ * <p>Inicializa la aplicación JavaFX y carga la ventana inicial del cliente de chat.</p>
  */
 public class App extends Application {
 
@@ -17,12 +18,15 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
-        scene = new Scene(loadFXML("vista/VentanaReto"), 640, 480);
+        // Asegúrate de que la ruta comience con "/" para buscar desde la raíz de resources,
+        // o ajusta la ruta relativa según dónde guardes el archivo .fxml
+        scene = new Scene(loadFXML("/com/example/vista/VentanaReto"), 640, 480);
+        stage.setTitle("Chat Multiusuario - PSP");
         stage.setScene(scene);
         stage.show();
     }
 
-    static void setRoot(String fxml) throws IOException {
+    public static void setRoot(String fxml) throws IOException {
         scene.setRoot(loadFXML(fxml));
     }
 
@@ -34,5 +38,4 @@ public class App extends Application {
     public static void main(String[] args) {
         launch();
     }
-
 }
