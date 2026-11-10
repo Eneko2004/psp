@@ -1,10 +1,14 @@
 module com.example {
     requires javafx.controls;
     requires javafx.fxml;
+    requires javafx.graphics;
 
-    // Permite que JavaFX acceda a las clases del paquete client por reflexión
-    opens client to javafx.graphics;
+    // Permite que JavaFX acceda a la clase App y al paquete client/controlador
+    exports com.example to javafx.graphics;
     
-    // Si también usas FXML en ese paquete u otros, asegúrate de abrirlos o exportarlos según necesites
+    opens client to javafx.graphics, javafx.fxml;
+    opens controlador to javafx.graphics, javafx.fxml;
+
     exports client;
+    exports controlador;
 }

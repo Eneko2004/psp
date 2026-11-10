@@ -1,9 +1,0 @@
-controlador\VentanaRetoController$HiloReceptor.class
-client\Cliente$HiloReceptor.class
-module-info.class
-com\example\App.class
-controlador\VentanaRetoController.class
-modelo\MensajeChat$Tipo.class
-modelo\MensajeChat.class
-server\Servidor.class
-client\Cliente.class
