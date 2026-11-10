@@ -92,50 +92,52 @@ public class Cliente extends Application {
     }
 
     private void conectar() {
-        String ip = tfIp.getText().trim();
-        String puertoStr = tfPuerto.getText().trim();
-        String usuario = tfUsuario.getText().trim();
+    String ip = tfIp.getText().trim();
+    String puertoStr = tfPuerto.getText().trim();
+    String usuario = tfUsuario.getText().trim();
 
-        if (ip.isEmpty() || puertoStr.isEmpty() || usuario.isEmpty()) {
-            mostrarAlerta("Por favor rellena la IP, el Puerto y tu Nombre de Usuario.");
-            return;
-        }
-
-        try {
-            int puerto = Integer.parseInt(puertoStr);
-            socket = new Socket(ip, puerto);
-            
-            // IMPORTANTE: Orden de apertura de streams para evitar bloqueo de socket
-            salida = new ObjectOutputStream(socket.getOutputStream());
-            salida.flush();
-            entrada = new ObjectInputStream(socket.getInputStream());
-
-            // Enviar mensaje de LOGIN usando el modelo MensajeChat
-            salida.writeObject(new MensajeChat(MensajeChat.Tipo.LOGIN, usuario, ""));
-            salida.flush();
-
-            conectado = true;
-            btnConectar.setDisable(true);
-            tfIp.setDisable(true);
-            tfPuerto.setDisable(true);
-            tfUsuario.setDisable(true);
-            btnDesconectar.setDisable(false);
-            btnEnviar.setDisable(false);
-            cbPrivado.setDisable(false);
-
-            taChat.appendText("[SISTEMA] Conectado exitosamente al servidor como: " + usuario + "\n");
-
-            // Hilo receptor independiente
-            Thread hiloReceptor = new Thread(new HiloReceptor());
-            hiloReceptor.setDaemon(true);
-            hiloReceptor.start();
-
-        } catch (NumberFormatException e) {
-            mostrarAlerta("El puerto debe ser un número entero válido.");
-        } catch (IOException e) {
-            mostrarAlerta("No se pudo conectar al servidor: " + e.getMessage());
-        }
+    if (ip.isEmpty() || puertoStr.isEmpty() || usuario.isEmpty()) {
+        mostrarAlerta("Por favor rellena la IP, el Puerto y tu Nombre de Usuario.");
+        return;
     }
+
+    try {
+        int puerto = Integer.parseInt(puertoStr);
+        socket = new Socket(ip, puerto);
+        
+        // ORDEN SEGURO: Creamos primero el OutputStream y hacemos flush, 
+        // luego creamos el InputStream para evitar bloqueos de cabeceras.
+        salida = new ObjectOutputStream(socket.getOutputStream());
+        salida.flush();
+        
+        entrada = new ObjectInputStream(socket.getInputStream());
+
+        // Enviar mensaje de LOGIN usando el modelo MensajeChat
+        salida.writeObject(new MensajeChat(MensajeChat.Tipo.LOGIN, usuario, ""));
+        salida.flush();
+
+        conectado = true;
+        btnConectar.setDisable(true);
+        tfIp.setDisable(true);
+        tfPuerto.setDisable(true);
+        tfUsuario.setDisable(true);
+        btnDesconectar.setDisable(false);
+        btnEnviar.setDisable(false);
+        cbPrivado.setDisable(false);
+
+        taChat.appendText("[SISTEMA] Conectado exitosamente al servidor como: " + usuario + "\n");
+
+        // Hilo receptor independiente
+        Thread hiloReceptor = new Thread(new HiloReceptor());
+        hiloReceptor.setDaemon(true);
+        hiloReceptor.start();
+
+    } catch (NumberFormatException e) {
+        mostrarAlerta("El puerto debe ser un número entero válido.");
+    } catch (IOException e) {
+        mostrarAlerta("No se pudo conectar al servidor: " + e.getMessage());
+    }
+}
 
     private void enviarMensaje() {
         String texto = tfMensaje.getText().trim();
