@@ -1,6 +1,9 @@
 package server;
 
 import modelo.MensajeChat;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.text.SimpleDateFormat;
@@ -11,32 +14,84 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Recurso compartido por todos los hilos del servidor: usuarios conectados, historial y estadísticas.
- *
- * Todos los métodos que tocan estos datos son "synchronized" (cerrojo = el propio gestor),
- * así que dos hilos nunca los modifican a la vez ni escriben a la vez en el mismo stream.
+ * Gestor del estado compartido del servidor de chat.
+ * <p>
+ * Esta clase actúa como un recurso crítico compartido entre múltiples hilos de ejecución 
+ * (uno por cada cliente conectado). Al tener todos sus métodos de modificación declarados 
+ * como {@code synchronized}, garantiza la exclusión mutua para evitar condiciones de carrera, 
+ * corrupción de streams y acceso concurrente indebido a la estructura de usuarios.
+ * </p>
+ * 
+ * @author Eneko.Plaza
+ * @version 1.0
  */
 public class GestorChat {
+
+    /** Número máximo de clientes simultáneos permitidos en el servidor. */
     private final int maxClientes;
-    private final Map<String, ObjectOutputStream> clientesConectados = new HashMap<>(); // usuario -> su salida
-    private final List<String> historialMensajes = new ArrayList<>(); // mensajes enviados
+
+    /** Mapa concurrente que asocia el nombre de usuario con su correspondiente flujo de salida de objetos. */
+    private final Map<String, ObjectOutputStream> clientesConectados = new HashMap<String, ObjectOutputStream>();
+
+    /** Lista con el historial de mensajes procesados por el servidor. */
+    private final List<String> historialMensajes = new ArrayList<String>();
+
+    /** Registro de resumen del último mensaje procesado para monitorización. */
     private String ultimoMensaje = "Ninguno";
+
+    /** Timestamp del momento exacto en el que inició la ejecución del servidor. */
     private final long tiempoInicio = System.currentTimeMillis();
 
+    /**
+     * Construye un gestor de chat indicando el límite máximo de conexiones.
+     * 
+     * @param maxClientes Número máximo de usuarios que pueden estar conectados al mismo tiempo.
+     */
     public GestorChat(int maxClientes) {
         this.maxClientes = maxClientes;
     }
 
-    /** Log global con fecha. static synchronized: las líneas de distintos hilos no se mezclan. */
+    /**
+     * Escribe una traza de log tanto en la consola de comandos como de forma persistente en el archivo {@code log/app.log}.
+     * <p>
+     * Al estar declarado como {@code static synchronized}, se asegura de que si varios hilos 
+     * intentan registrar un evento simultáneamente, no corrompan ni solapen el contenido del fichero físico.
+     * </p>
+     * 
+     * @param mensaje Texto explicativo del evento a registrar.
+     */
     public static synchronized void log(String mensaje) {
         String fecha = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        System.out.println("[" + fecha + "] " + mensaje);
+        String textoLog = "[" + fecha + "] " + mensaje;
+
+        // 1. Salida en la consola del sistema
+        System.out.println(textoLog);
+
+        // 2. Persistencia en fichero físico log/app.log
+        try {
+            File carpeta = new File("log");
+            if (!carpeta.exists()) {
+                carpeta.mkdirs();
+            }
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter("log/app.log", true))) {
+                writer.write(textoLog);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error al guardar log: " + e.getMessage());
+        }
     }
 
     /**
-     * Registra a un usuario. Devuelve null si todo va bien o el motivo del rechazo.
-     * Límite y nombre se comprueban en el MISMO synchronized: si entran dos a la vez,
-     * no se pueden pasar del máximo ni coger el mismo nombre.
+     * Intenta registrar e iniciar sesión de un nuevo usuario en la plataforma.
+     * <p>
+     * Comprueba de manera atómica que el servidor no haya alcanzado el límite máximo 
+     * de capacidad y que el nombre deseado no esté repetido o vacío.
+     * </p>
+     * 
+     * @param nombre Nombre del usuario que intenta identificarse.
+     * @param salida Flujo {@link ObjectOutputStream} asociado al socket del cliente para enviarle datos.
+     * @return {@code null} si el registro fue exitoso; o un texto con la causa de rechazo en caso de fallo.
      */
     public synchronized String registrar(String nombre, ObjectOutputStream salida) {
         if (clientesConectados.size() >= maxClientes) {
@@ -52,7 +107,11 @@ public class GestorChat {
         return null;
     }
 
-    /** Quita a un usuario de la lista y avisa al resto. */
+    /**
+     * Elimina a un usuario de la lista activa de conexiones y notifica a los demás clientes.
+     * 
+     * @param nombre Nombre del usuario que se desconecta.
+     */
     public synchronized void eliminar(String nombre) {
         if (nombre != null && clientesConectados.remove(nombre) != null) {
             log("Usuario desconectado: " + nombre);
@@ -61,7 +120,12 @@ public class GestorChat {
         }
     }
 
-    /** Mensaje público: se guarda y se reenvía a todos. */
+    /**
+     * Procesamiento de un mensaje público difundido hacia la totalidad de los miembros activos.
+     * 
+     * @param emisor Nombre del cliente que redactó el mensaje.
+     * @param texto Contenido textual del mensaje enviado.
+     */
     public synchronized void mensajePublico(String emisor, String texto) {
         log("Mensaje público de [" + emisor + "]: " + texto);
         registrarMensaje(emisor + " (Público): " + texto);
@@ -69,27 +133,35 @@ public class GestorChat {
     }
 
     /**
-     * MensajeChat privado: al destinatario y una copia al emisor (para que lo vea en su ventana).
-     * Si el destinatario no está (o es él mismo), el emisor recibe un ERROR.
+     * Envía un mensaje en privado de un emisor concreto hacia un receptor específico.
+     * 
+     * @param emisor Nombre del remitente.
+     * @param destinatario Nombre del receptor proyectado.
+     * @param texto Contenido del mensaje confidencial.
      */
     public synchronized void mensajePrivado(String emisor, String destinatario, String texto) {
         ObjectOutputStream emisorOut = clientesConectados.get(emisor);
         ObjectOutputStream destinoOut = clientesConectados.get(destinatario);
 
         if (destinoOut == null || destinoOut == emisorOut) {
-            log("MensajeChat privado NO entregado de [" + emisor + "] para [" + destinatario + "]: no disponible");
+            log("Mensaje privado NO entregado de [" + emisor + "] para [" + destinatario + "]: no disponible");
             enviar(emisor, emisorOut, new MensajeChat(MensajeChat.Tipo.ERROR, "SERVIDOR",
                     "El usuario " + destinatario + " no está disponible."));
             return;
         }
-        log("MensajeChat privado de [" + emisor + "] para [" + destinatario + "]: " + texto);
+        log("Mensaje privado de [" + emisor + "] para [" + destinatario + "]: " + texto);
         registrarMensaje(emisor + " -> " + destinatario + " (Privado)");
         MensajeChat privado = new MensajeChat(MensajeChat.Tipo.PRIVADO, emisor, destinatario, texto);
         enviar(destinatario, destinoOut, privado);
         enviar(emisor, emisorOut, privado);
     }
 
-    /** Lo llama el hilo monitor: clientes conectados, tiempo activo y último mensaje. */
+    /**
+     * Muestra por consola las métricas de rendimiento y estado del servidor de socket.
+     * <p>
+     * Este método es ejecutado periódicamente por el hilo monitor independiente.
+     * </p>
+     */
     public synchronized void mostrarEstadisticas() {
         long segundos = (System.currentTimeMillis() - tiempoInicio) / 1000;
         String tiempoActivo = String.format("%02d:%02d:%02d", segundos / 3600, (segundos % 3600) / 60, segundos % 60);
@@ -102,31 +174,48 @@ public class GestorChat {
         System.out.println("----------------------------------------------------\n");
     }
 
-    // ----- Métodos privados: solo se llaman desde métodos que ya tienen el cerrojo -----
-
+    /**
+     * Guarda el resumen del mensaje en la memoria interna de historial.
+     * 
+     * @param resumen Resumen descriptivo de la acción enviada.
+     */
     private void registrarMensaje(String resumen) {
         ultimoMensaje = resumen;
         historialMensajes.add(resumen);
     }
 
+    /**
+     * Reenvía un paquete de datos {@link MensajeChat} a cada uno de los clientes conectados.
+     * 
+     * @param mensaje Objeto serializable del mensaje a distribuir.
+     */
     private void enviarATodos(MensajeChat mensaje) {
         for (Map.Entry<String, ObjectOutputStream> cliente : clientesConectados.entrySet()) {
             enviar(cliente.getKey(), cliente.getValue(), mensaje);
         }
     }
 
+    /**
+     * Notifica el listado actualizado de usuarios activos a todos los miembros de la sala.
+     */
     private void enviarListaUsuarios() {
-        enviarATodos(new MensajeChat(MensajeChat.Tipo.USERLIST, new ArrayList<>(clientesConectados.keySet())));
+        enviarATodos(new MensajeChat(MensajeChat.Tipo.USERLIST, new ArrayList<String>(clientesConectados.keySet())));
     }
 
+    /**
+     * Emite un mensaje de chat a través de un canal de datos hacia un cliente concreto.
+     * 
+     * @param nombre Nombre descriptivo del cliente destino.
+     * @param out Stream de salida del canal TCP/IP.
+     * @param mensaje Objeto serializado a enviar.
+     */
     private void enviar(String nombre, ObjectOutputStream out, MensajeChat mensaje) {
         if (out == null) return;
         try {
-            out.reset(); // Olvida los objetos ya enviados (si no, la lista de usuarios no se actualizaría)
+            out.reset();
             out.writeObject(mensaje);
             out.flush();
         } catch (IOException e) {
-            // Ese cliente se está cayendo: su propio hilo lo detectará y lo quitará de la lista
             log("No se pudo enviar el mensaje a " + nombre + " (" + e.getMessage() + ")");
         }
     }
