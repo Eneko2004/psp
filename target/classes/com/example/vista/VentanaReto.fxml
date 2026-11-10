@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.Pane?>
+
+<Pane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="496.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controlador.VentanaRetoController">
+   <children>
+      <!-- Configuración de Conexión -->
+      <Label layoutX="20.0" layoutY="25.0" text="IP:" />
+      <TextField fx:id="tfIp" layoutX="40.0" layoutY="21.0" prefHeight="25.0" prefWidth="130.0" text="127.0.0.1" />
+      
+      <Label layoutX="185.0" layoutY="25.0" text="Puerto:" />
+      <TextField fx:id="tfPuerto" layoutX="230.0" layoutY="21.0" prefHeight="25.0" prefWidth="60.0" text="5000" />
+      
+      <Label layoutX="305.0" layoutY="25.0" text="Usuario:" />
+      <TextField fx:id="tfUsuario" layoutX="355.0" layoutY="21.0" prefHeight="25.0" prefWidth="110.0" promptText="Tu nick" />
+      
+      <Button fx:id="btnConectar" layoutX="480.0" layoutY="21.0" mnemonicParsing="false" onAction="#conectar" text="Conectar" />
+      <Button fx:id="btnDesconectar" layoutX="550.0" layoutY="21.0" mnemonicParsing="false" onAction="#desconectar" text="Desconectar" />
+      
+      <!-- Área de Chat (Izquierda) -->
+      <TextArea fx:id="taChat" editable="false" layoutX="14.0" layoutY="60.0" prefHeight="355.0" prefWidth="650.0" wrapText="true" />
+      
+      <!-- Lista de Usuarios Conectados (Derecha) -->
+      <ListView fx:id="lvUsuarios" layoutX="680.0" layoutY="60.0" prefHeight="355.0" prefWidth="205.0" />
+      
+      <!-- Panel de Envío de Mensajes -->
+      <CheckBox fx:id="cbPrivado" layoutX="20.0" layoutY="440.0" mnemonicParsing="false" text="Privado" />
+      
+      <TextField fx:id="tfMensaje" layoutX="100.0" layoutY="436.0" prefHeight="25.0" prefWidth="680.0" promptText="Escribe un mensaje aquí..." onAction="#enviarMensaje" />
+      
+      <Button fx:id="btnEnviar" layoutX="795.0" layoutY="436.0" mnemonicParsing="false" onAction="#enviarMensaje" prefHeight="25.0" prefWidth="90.0" text="Enviar" />
+   </children>
+</Pane>

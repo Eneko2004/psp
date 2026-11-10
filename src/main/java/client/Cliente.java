@@ -1,5 +1,6 @@
 package client;
 
+import modelo.MensajeChat;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -12,12 +13,13 @@ import javafx.stage.Stage;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.List;
 
 public class Cliente extends Application {
 
     // Componentes JavaFX
     private TextField tfIp = new TextField("127.0.0.1");
-    private TextField tfPuerto = new TextField("5000");
+    private TextField tfPuerto = new TextField("5050");
     private TextField tfUsuario = new TextField();
     private Button btnConectar = new Button("Conectar");
     private Button btnDesconectar = new Button("Desconectar");
@@ -30,10 +32,10 @@ public class Cliente extends Application {
 
     private ObservableList<String> usuariosObs = FXCollections.observableArrayList();
 
-    // Sockets y Hilos
+    // Sockets y Streams de Objetos
     private Socket socket;
-    private PrintWriter salida;
-    private BufferedReader entrada;
+    private ObjectOutputStream salida;
+    private ObjectInputStream entrada;
     private boolean conectado = false;
 
     public static void main(String[] args) {
@@ -102,11 +104,15 @@ public class Cliente extends Application {
         try {
             int puerto = Integer.parseInt(puertoStr);
             socket = new Socket(ip, puerto);
-            salida = new PrintWriter(socket.getOutputStream(), true);
-            entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            
+            // IMPORTANTE: Orden de apertura de streams para evitar bloqueo de socket
+            salida = new ObjectOutputStream(socket.getOutputStream());
+            salida.flush();
+            entrada = new ObjectInputStream(socket.getInputStream());
 
-            // Enviar el nombre como primer mensaje de autenticación
-            salida.println(usuario);
+            // Enviar mensaje de LOGIN usando el modelo MensajeChat
+            salida.writeObject(new MensajeChat(MensajeChat.Tipo.LOGIN, usuario, ""));
+            salida.flush();
 
             conectado = true;
             btnConectar.setDisable(true);
@@ -119,7 +125,7 @@ public class Cliente extends Application {
 
             taChat.appendText("[SISTEMA] Conectado exitosamente al servidor como: " + usuario + "\n");
 
-            // Hilo receptor independiente para que la interfaz nunca se bloquee
+            // Hilo receptor independiente
             Thread hiloReceptor = new Thread(new HiloReceptor());
             hiloReceptor.setDaemon(true);
             hiloReceptor.start();
@@ -133,45 +139,59 @@ public class Cliente extends Application {
 
     private void enviarMensaje() {
         String texto = tfMensaje.getText().trim();
+        String usuarioActual = tfUsuario.getText().trim();
         if (texto.isEmpty() || !conectado) return;
 
-        if (cbPrivado.isSelected()) {
-            String seleccionado = lvUsuarios.getSelectionModel().getSelectedItem();
-            if (seleccionado == null || seleccionado.equals(tfUsuario.getText().trim())) {
-                mostrarAlerta("Selecciona un usuario válido de la lista lateral para enviar un mensaje privado.");
-                return;
+        try {
+            if (cbPrivado.isSelected()) {
+                String seleccionado = lvUsuarios.getSelectionModel().getSelectedItem();
+                if (seleccionado == null || seleccionado.equals(usuarioActual)) {
+                    mostrarAlerta("Selecciona un usuario válido de la lista lateral para enviar un mensaje privado.");
+                    return;
+                }
+                // Enviar mensaje privado usando MensajeChat
+                salida.writeObject(new MensajeChat(MensajeChat.Tipo.PRIVADO, usuarioActual, seleccionado, texto));
+                salida.flush();
+                taChat.appendText("[Tú -> Privado a " + seleccionado + "]: " + texto + "\n");
+            } else {
+                // Enviar mensaje público usando MensajeChat
+                salida.writeObject(new MensajeChat(MensajeChat.Tipo.PUBLICO, usuarioActual, texto));
+                salida.flush();
             }
-            salida.println("PRIVATE:" + seleccionado + ":" + texto);
-            taChat.appendText("[Tú -> Privado a " + seleccionado + "]: " + texto + "\n");
-        } else {
-            salida.println(texto);
+            tfMensaje.clear();
+        } catch (IOException e) {
+            mostrarAlerta("Error al enviar el mensaje: " + e.getMessage());
         }
-        tfMensaje.clear();
     }
 
-    // Hilo secundario para recibir mensajes en segundo plano
+    // Hilo secundario para recibir objetos del servidor
     private class HiloReceptor implements Runnable {
         @Override
         public void run() {
             try {
-                String linea;
-                while (conectado && (linea = entrada.readLine()) != null) {
-                    final String msg = linea;
+                Object obj;
+                while (conectado && (obj = entrada.readObject()) != null) {
+                    if (obj instanceof MensajeChat) {
+                        MensajeChat msg = (MensajeChat) obj;
 
-                    // Actualización segura de JavaFX desde un hilo secundario
-                    Platform.runLater(() -> {
-                        if (msg.startsWith("USERLIST:")) {
-                            String[] users = msg.substring(9).split(",");
-                            usuariosObs.clear();
-                            for (String u : users) {
-                                usuariosObs.add(u);
+                        Platform.runLater(() -> {
+                            if (msg.getTipo() == MensajeChat.Tipo.USERLIST) {
+                                List<String> users = msg.getListaUsuarios();
+                                usuariosObs.clear();
+                                if (users != null) {
+                                    usuariosObs.addAll(users);
+                                }
+                            } else if (msg.getTipo() == MensajeChat.Tipo.PRIVADO) {
+                                taChat.appendText("[PRIVADO de " + msg.getEmisor() + "]: " + msg.getTexto() + "\n");
+                            } else if (msg.getTipo() == MensajeChat.Tipo.PUBLICO) {
+                                taChat.appendText(msg.getEmisor() + ": " + msg.getTexto() + "\n");
+                            } else if (msg.getTipo() == MensajeChat.Tipo.SERVER) {
+                                taChat.appendText("[SERVIDOR] " + msg.getTexto() + "\n");
                             }
-                        } else {
-                            taChat.appendText(msg + "\n");
-                        }
-                    });
+                        });
+                    }
                 }
-            } catch (IOException e) {
+            } catch (IOException | ClassNotFoundException e) {
                 if (conectado) {
                     Platform.runLater(() -> {
                         taChat.appendText("[SISTEMA] Conexión perdida con el servidor.\n");

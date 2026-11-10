@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class Servidor {
-    private static final int PUERTO = 5000;
+    private static final int PUERTO = 5050;
     private static final int MAX_CLIENTES = 5;
 
     private static final Map<String, ObjectOutputStream> clientesConectados = new HashMap<>();
