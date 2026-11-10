@@ -1,0 +1,14 @@
+[2026-11-10 18:22:55] Servidor encendido en el puerto 5050 (Máx. clientes: 5)
+[2026-11-10 18:25:52] Nueva conexión aceptada desde: /127.0.0.1
+[2026-11-10 18:25:52] Usuario registrado con éxito: aaaa
+[2026-11-10 18:26:36] Nueva conexión aceptada desde: /127.0.0.1
+[2026-11-10 18:26:36] Usuario registrado con éxito: eeeeeeeee
+[2026-11-10 18:26:44] Mensaje privado de [eeeeeeeee] para [aaaa]: asasasasasa
+[2026-11-10 18:27:04] Nueva conexión aceptada desde: /127.0.0.1
+[2026-11-10 18:27:04] Usuario registrado con éxito: eneko
+[2026-11-10 18:27:49] Conexión perdida con el usuario: aaaa
+[2026-11-10 18:27:49] Usuario desconectado: aaaa
+[2026-11-10 18:27:51] Conexión perdida con el usuario: eeeeeeeee
+[2026-11-10 18:27:51] Usuario desconectado: eeeeeeeee
+[2026-11-10 18:27:54] Conexión perdida con el usuario: eneko
+[2026-11-10 18:27:54] Usuario desconectado: eneko
